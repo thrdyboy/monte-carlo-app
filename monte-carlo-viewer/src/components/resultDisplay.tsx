@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { getData } from "../services/api";
 import type { DataResponse } from "../types/api";
+import { GetImageUrl } from "../utils/getImageUrl";
 
 
 export const ResultsDisplay = () => {
@@ -63,7 +64,7 @@ export const ResultsDisplay = () => {
             <div className="bg-white p-4 rounded shadow">
                 <h3 className="text-lg font-semibold">Time Series Plot</h3>
                 <img
-                    src={`${data.plot_urls.timeseries}?=t${refreshKey}`}
+                    src={`${GetImageUrl(data.plot_urls.timeseries)}?=t${refreshKey}`}
                     alt="Time Series"
                     className="w-full border rounded"
                 />
@@ -79,7 +80,7 @@ export const ResultsDisplay = () => {
             <div className="bg-white p-4 rounded shadow">
                 <h3 className="text-lg font-semibold">Heatmap</h3>
                 <img
-                    src={`${data.plot_urls.heatmap}?=t${refreshKey}`}
+                    src={`${GetImageUrl(data.plot_urls.heatmap)}?=t${refreshKey}`}
                     alt="Heatmap"
                     className="w-full border rounded"
                 />
