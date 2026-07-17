@@ -64,12 +64,12 @@ export const ResultsDisplay = () => {
             <div className="bg-white p-4 rounded shadow">
                 <h3 className="text-lg font-semibold">Time Series Plot</h3>
                 <img
-                    src={`${GetImageUrl(data.plot_urls.timeseries)}?=t${refreshKey}`}
+                    src={`${GetImageUrl(data.plot_urls.timeseries)}?t=${refreshKey}`}
                     alt="Time Series"
                     className="w-full border rounded"
                 />
                 <button
-                    onClick={() => downloadImage(data.plot_urls.timeseries, "timeseries_plot.png")}
+                    onClick={() => downloadImage(GetImageUrl(data.plot_urls.timeseries), "timeseries_plot.png")}
                     className="mt-2 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded"
                 >
                     Download Timeseries
@@ -80,12 +80,12 @@ export const ResultsDisplay = () => {
             <div className="bg-white p-4 rounded shadow">
                 <h3 className="text-lg font-semibold">Heatmap</h3>
                 <img
-                    src={`${GetImageUrl(data.plot_urls.heatmap)}?=t${refreshKey}`}
+                    src={`${GetImageUrl(data.plot_urls.heatmap)}?t=${refreshKey}`}
                     alt="Heatmap"
                     className="w-full border rounded"
                 />
                 <button
-                    onClick={() => downloadImage(data.plot_urls.heatmap, "heatmap_plot.png")}
+                    onClick={() => downloadImage(GetImageUrl(data.plot_urls.heatmap), "heatmap_plot.png")}
                     className="mt-2 bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded"
                 >
                     Download Heatmap
