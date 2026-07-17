@@ -20,11 +20,11 @@ export default defineConfig(({ mode }) => {
 
     server: {
       proxy: {
-        '/api': {
-          target: env.VITE_BACKEND_URL as string,
-          changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/api/, ''),
-        },
+        // '/api': {
+        //   target: env.VITE_BACKEND_URL as string,
+        //   changeOrigin: true,
+        //   rewrite: (path) => path.replace(/^\/api/, ''),
+        // },
         '/static': {
           target: env.VITE_BACKEND_URL as string,
           changeOrigin: true,
