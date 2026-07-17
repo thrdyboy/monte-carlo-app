@@ -1,0 +1,16 @@
+# Conda Environment
+env/
+envs/
+.conda/
+venv/
+.venv/
+
+# Cache & Metadata
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.ipynb_checkpoints/
+
+# Tests folder
+tests

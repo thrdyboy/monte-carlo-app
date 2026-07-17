@@ -1,0 +1,25 @@
+data:
+  raw_dir: "data/raw/"
+  processed_path: "data/processed/simulations_result.csv"
+  sheet_name: 0
+
+monte_carlo:
+  num_simulations: 1000
+  forecast_years: 5
+  random_seed: 42
+
+columns:
+  index: "Tahun"
+  months:
+    - "Jan"
+    - "Feb"
+    - "Mar"
+    - "Apr"
+    - "Mei"
+    - "Jun"
+    - "Jul"
+    - "Agu"
+    - "Sep"
+    - "Okt"
+    - "Nov"
+    - "Des"
