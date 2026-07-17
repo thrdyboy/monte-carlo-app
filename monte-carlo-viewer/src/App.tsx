@@ -10,7 +10,15 @@ function App() {
         <div>
           <h1 className="text-3xl font-bold text-blue-700">Monte Carlo Rainfall Prediction</h1>
           <p className="text-gray-600 mt-2">
-            Run simulation either from manual inputs or by uploading an Excel file.
+            Created By: M. Yusef Tiansyah,
+            F. Heru Widodo,
+            S. Bahri,
+            S. Tikno,
+            Tukiyat,
+            Muktiyono
+          </p>
+          <p className="text-gray-500">
+            KR. TMC PRLSDA ORKM BRIN.
           </p>
         </div>
 
