@@ -4,7 +4,7 @@ data:
   sheet_name: 0
 
 monte_carlo:
-  num_simulations: 1000
+  num_simulations: 5000
   forecast_years: 5
   random_seed: 42
 

@@ -8,11 +8,14 @@ function App() {
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-6xl mx-auto py-10 px-4 space-y-8">
         <div>
-          <h1 className="text-3xl font-bold text-blue-700">APLIKASI 
+          <h1 className="text-3xl font-bold text-blue-700">
+            APLIKASI
             SISTEM INFORMASI PREDIKSI
-            CURAH HUJAN STOKASTIK
-            BERBASIS KOMPUTASI MONTE CARLO
-            DAN ALGORITMA BOOTSTRAPPING PYTHON
+            <br>
+              CURAH HUJAN STOKASTIK
+              BERBASIS KOMPUTASI MONTE CARLO
+              DAN ALGORITMA BOOTSTRAPPING PYTHON
+            </br>
           </h1>
           <p className="text-gray-600 mt-2">
             Created By: M. Yusef Tiansyah,
@@ -33,7 +36,7 @@ function App() {
         </div>
 
         <hr className="my-8" />
-        <ResultsDisplay/>
+        <ResultsDisplay />
       </div>
     </div>
   )
