@@ -11,11 +11,10 @@ function App() {
           <h1 className="text-3xl font-bold text-blue-700">
             APLIKASI
             SISTEM INFORMASI PREDIKSI
-            <br>
+            <br />
               CURAH HUJAN STOKASTIK
               BERBASIS KOMPUTASI MONTE CARLO
               DAN ALGORITMA BOOTSTRAPPING PYTHON
-            </br>
           </h1>
           <p className="text-gray-600 mt-2">
             Created By: M. Yusef Tiansyah,
