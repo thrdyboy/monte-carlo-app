@@ -8,7 +8,12 @@ function App() {
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-6xl mx-auto py-10 px-4 space-y-8">
         <div>
-          <h1 className="text-3xl font-bold text-blue-700">Monte Carlo Rainfall Prediction</h1>
+          <h1 className="text-3xl font-bold text-blue-700">APLIKASI 
+            SISTEM INFORMASI PREDIKSI
+            CURAH HUJAN STOKASTIK
+            BERBASIS KOMPUTASI MONTE CARLO
+            DAN ALGORITMA BOOTSTRAPPING PYTHON
+          </h1>
           <p className="text-gray-600 mt-2">
             Created By: M. Yusef Tiansyah,
             F. Heru Widodo,
