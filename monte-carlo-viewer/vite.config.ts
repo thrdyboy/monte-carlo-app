@@ -22,7 +22,7 @@ export default defineConfig(({ mode }) => {
         //   rewrite: (path) => path.replace(/^\/api/, ''),
         // },
         '/static': {
-          target: env.VITE_BACKEND_URL as string,
+          target: env.VITE_BACKEND_URL,
           changeOrigin: true,
         }
       },

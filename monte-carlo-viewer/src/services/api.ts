@@ -26,7 +26,10 @@ export async function runFromExcel(data: RunFromExcelRequest): Promise<RunSimula
 }
 
 export async function getData(): Promise<DataResponse> {
-    const res = await axiosInstance.get('/get-data')
+    const res = await axiosInstance.get('/get-data', {
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
     return res.data as DataResponse
 }
-

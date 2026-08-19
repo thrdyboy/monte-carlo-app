@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { getData } from "../services/api";
 import type { DataResponse } from "../types/api";
 import { GetImageUrl } from "../utils/getImageUrl";
-
+import { downloadSimulationExcel } from "../utils/excelUtils";
 
 export const ResultsDisplay = () => {
     const [data, setData] = useState<DataResponse | null>(null)
@@ -30,16 +30,6 @@ export const ResultsDisplay = () => {
     useEffect(() => {
         fetchData()
     }, [])
-
-    const downloadImage = (url: string, filename: string) => {
-    
-        const link = document.createElement("a");
-        link.href = url
-        link.download = filename
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-    };
 
     if (loading) return <div>Loading results...</div>
     if (error) return <div className="text-red-500">{error}</div>
@@ -68,12 +58,6 @@ export const ResultsDisplay = () => {
                     alt="Time Series"
                     className="w-full border rounded"
                 />
-                <button
-                    onClick={() => downloadImage(GetImageUrl(data.plot_urls.timeseries), "timeseries_plot.png")}
-                    className="mt-2 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded"
-                >
-                    Download Timeseries
-                </button>
             </div>
 
             {/* Heatmap */}
@@ -84,21 +68,31 @@ export const ResultsDisplay = () => {
                     alt="Heatmap"
                     className="w-full border rounded"
                 />
-                <button
-                    onClick={() => downloadImage(GetImageUrl(data.plot_urls.heatmap), "heatmap_plot.png")}
-                    className="mt-2 bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded"
-                >
-                    Download Heatmap
-                </button>
             </div>
 
-            {/* Refresh button */}
-            <button
-                onClick={fetchData}
-                className="bg-gray-600 hover:bg-gray-700 text-white py-2 px-4 rounded"
-            >
-                Refresh Data
-            </button>
+            <div className="flex flex-wrap items-center gap-3">
+                {/* Refresh Button */}
+                <button
+                    onClick={fetchData}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-xl shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200 active:scale-95"
+                >
+                    <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Refresh Data
+                </button>
+
+                {/* Export to Excel Button */}
+                <button
+                    onClick={() => downloadSimulationExcel()}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-emerald-600 rounded-xl shadow-sm hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition-all duration-200 active:scale-95"
+                >
+                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Export to Excel
+                </button>
+            </div>
         </div>
     )
 }
