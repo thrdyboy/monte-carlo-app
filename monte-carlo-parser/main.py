@@ -2,11 +2,19 @@ from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
-from typing import Dict, Optional
+from typing import Optional
 import json
 import os
 import sys
+# For Download the Results of Excel
+from fastapi.responses import StreamingResponse
+from openpyxl import Workbook
+from openpyxl.drawing.image import Image as XLImage
+from io import BytesIO
+
+import pandas as pd
+from openpyxl.formatting.rule import ColorScaleRule
+from openpyxl.drawing.image import Image as XLImage
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
@@ -15,6 +23,8 @@ from src.etl.transform import transform
 from src.etl.load import load
 from src.config.settings import load_config
 from src.utils.validators import validate_simulation_input
+from src.utils.das_monte_carlo import generate_das_report
+from src.utils.schemas import DASSimulationRequest, SimulationRequest
 
 app = FastAPI(title="Monte Carlo Simulation API")
 
@@ -30,10 +40,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-class SimulationRequest(BaseModel):
-    data: Dict[int, Dict[str, float]]
-    forecast_years: Optional[int] = None
 
 @app.get("/")
 async def root():
@@ -102,8 +108,6 @@ async def run_from_excel(
     except Exception as e:
         raise HTTPException(500, "Failed, Internal Server Error")
 
-
-
 @app.get("/get-data")
 async def getAllData():
     try:
@@ -128,23 +132,75 @@ async def getAllData():
             "metrics": metrics,
             "plot_urls": {
                 "timeseries": "/static/timeseries_plot.png",
-                "heatmap": "/static/heatmap_plot.png"
+                "heatmap": "/static/heatmap_plot.png",
+                "das_chart": "/static/grafik_konversi_das.png"
             },
             "forecast_years_used": metadata.get("forecast_years"),
-            "random_seed_used": metadata.get("random_seed")
+            "random_seed_used": metadata.get("random_seed"),
+            "das_parameters": metadata.get("das_parameters")
         }
     except Exception as e:
         raise HTTPException(500, detail=str(e))
 
-# For Download the Results of Excel
-from fastapi.responses import StreamingResponse
-from openpyxl import Workbook
-from openpyxl.drawing.image import Image as XLImage
-from io import BytesIO
+@app.post("/post-das")
+async def postDasParameter(req: DASSimulationRequest):
+    try:
+        config = load_config()
+        processed_dir = os.path.dirname(os.path.abspath(config.data.processed_path))
+        
+        # Path file data simulasi Monte Carlo & metadata
+        pred_csv_path = os.path.join(processed_dir, 'das_monte_carlo.csv')
+        metadata_path = os.path.join(processed_dir, 'metadata.json')
+        das_excel_path = os.path.join(processed_dir, 'Konversi_Curah_Hujan_DAS.xlsx')
+        das_chart_path = os.path.join(processed_dir, 'grafik_konversi_das.png')
 
-import pandas as pd
-from openpyxl.formatting.rule import ColorScaleRule
-from openpyxl.drawing.image import Image as XLImage
+        # 1. Pastikan data simulasi Monte Carlo sudah pernah dihitung/tersimpan
+        if not os.path.exists(pred_csv_path):
+            raise HTTPException(
+                status_code=400, 
+                detail="Data simulasi Monte Carlo belum ditemukan. Jalankan simulasi Monte Carlo terlebih dahulu."
+            )
+
+        # 2. Baca data hasil prediksi Monte Carlo yang sudah ada
+        df_predictions = pd.read_csv(pred_csv_path, index_col=0)
+
+        # 3. Jalankan ulang kalkulasi DAS menggunakan parameter BARU dari req
+        das_hasil = generate_das_report(
+            data=df_predictions,
+            cn_value=req.cn_value if req.cn_value is not None else 75.0,
+            area_km2=req.area_km2 if req.area_km2 is not None else 100.0,
+            n_trials=req.n_trials if req.n_trials is not None else 500,
+            output_excel=das_excel_path,
+            output_chart=das_chart_path
+        )
+
+        # 4. Baca metadata.json yang lama (jika ada)
+        metadata_dict = {}
+        if os.path.exists(metadata_path):
+            with open(metadata_path, 'r') as f:
+                try:
+                    metadata_dict = json.load(f)
+                except json.JSONDecodeError:
+                    metadata_dict = {}
+
+        # 5. Perbarui bagian das_parameters di metadata.json
+        metadata_dict['das_parameters'] = das_hasil.get('das_parameters')
+
+        # 6. Simpan kembali metadata.json yang sudah diperbarui
+        with open(metadata_path, 'w') as f:
+            json.dump(metadata_dict, f, indent=4)
+
+        return {
+            "status": "success",
+            "message": "Parameter DAS berhasil diperbarui dan dihitung ulang!"
+        }
+
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/export-excel")
 async def export_excel():
@@ -221,4 +277,21 @@ async def export_excel():
         buffer,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": "attachment; filename=simulation_results.xlsx"}
+    )
+
+@app.get("/export-excel-das")
+async def export_excel_das():
+    config = load_config()
+    out_dir = os.path.dirname(os.path.abspath(config.data.processed_path))
+    das_excel_path = os.path.join(out_dir, 'Konversi_Curah_Hujan_DAS.xlsx')
+
+    # Validasi apakah file sumber ada
+    if not os.path.exists(das_excel_path):
+        raise HTTPException(404, "Laporan DAS belum tersedia. Jalankan simulasi terlebih dahulu.")
+
+
+    return FileResponse(
+        das_excel_path,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        filename="Konversi_Curah_Hujan_DAS.xlsx"
     )

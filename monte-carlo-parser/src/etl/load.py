@@ -1,6 +1,5 @@
 import os
 import sys
-import pandas as pd
 import matplotlib
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -8,8 +7,10 @@ import json
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from etl.transform import transform
+from utils.das_monte_carlo import generate_das_report
+from utils.schemas import DASSimulationRequest
 
-
+ 
 def _is_interactive_backend() -> bool:
     """Backend non-GUI (Agg, pdf, svg, ps, cairo, dst) cuma bisa nulis ke
     file dan nggak bisa munculin window -- plt.show() di backend itu cuma
@@ -35,6 +36,7 @@ def load(result=None, file_path=None, manual_data=None, forecast_years=None, ove
 
     config = result['config']
     df_combined = result['df_combined']
+    df_pred = result['df_pred']
     ts_hist = result['ts_hist']
     ts_pred = result['ts_pred']
     ts_pred_conn = result['ts_pred_conn']
@@ -79,19 +81,63 @@ def load(result=None, file_path=None, manual_data=None, forecast_years=None, ove
     else:
         plt.close(fig2)
 
+    das_input_df = df_pred.reset_index()
+
+    das_excel_path = os.path.join(output_dir, 'Konversi_Curah_Hujan_DAS.xlsx')
+    das_chart_path = os.path.join(output_dir, 'grafik_konversi_das.png')
+
+    das_params: DASSimulationRequest = None
+    
+    # Default Numbers
+    cn_val = 75.0
+    area_val = 100.0
+    n_trials_val = 500
+
+    # Jika React mengirim data das_params, timpa nilai defaultnya
+    if das_params:
+        cn_val = das_params.cn_value
+        area_val = das_params.area_km2
+        n_trials_val = das_params.n_trials
+
+    try:
+        das_hasil = generate_das_report(
+            data=das_input_df, 
+            cn_value=cn_val,
+            area_km2=area_val,
+            n_trials=n_trials_val,
+            output_excel=das_excel_path,
+            output_chart=das_chart_path
+        )
+        print(f"Laporan & Grafik DAS berhasil dibuat di:\n- {das_excel_path}\n- {das_chart_path}")
+    except Exception as e:
+        print(f"Gagal membuat laporan DAS: {e}")
+
     metrics_path = os.path.join(output_dir, 'metrics.json')
     with open(metrics_path, "w") as f:
         json.dump(result['metrics'], f)
+
+    metadata_dict = {
+        "forecast_years": config.monte_carlo.forecast_years,
+        "random_seed": config.monte_carlo.random_seed
+    }
+
+    if das_hasil and 'das_parameters' in das_hasil:
+        metadata_dict['das_parameters'] = das_hasil['das_parameters']
 
     metadata_path = os.path.join(output_dir, "metadata.json")
     with open(metadata_path, "w") as f:
         json.dump({
             "forecast_years": config.monte_carlo.forecast_years,
-            "random_seed": config.monte_carlo.random_seed
+            "random_seed": config.monte_carlo.random_seed,
+            "das_parameters": das_hasil['das_parameters']
         }, f)
     if output_file.endswith('.csv'):
         df_combined.to_csv(output_file, index=True)
     else:
         df_combined.to_excel(output_file, index=True)
+
+    pred_output_path = os.path.join(output_dir, 'das_monte_carlo.csv')
+    das_input_df.to_csv(pred_output_path, index=False)
+    print(f"Data prediksi (Monte Carlo only) disimpan ke '{pred_output_path}'")
 
     print(f"Finish! File '{output_file}' successfully created.")

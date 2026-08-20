@@ -1,4 +1,4 @@
-import type { DataResponse, RunFromExcelRequest, RunSimulationRequest, RunSimulationResponse } from "../types/api";
+import type { DataResponse, PostDASParams, RunFromExcelRequest, RunSimulationRequest, RunSimulationResponse } from "../types/api";
 import axiosInstance from "./axios_service";
 
 export async function runSimulation(data: RunSimulationRequest): Promise<RunSimulationResponse> {
@@ -22,6 +22,16 @@ export async function runFromExcel(data: RunFromExcelRequest): Promise<RunSimula
             forecast_years: data.forecast_years
         }
     })
+    return res.data as RunSimulationResponse
+}
+
+export async function DasSimulationRun(params_data: PostDASParams): Promise<RunSimulationResponse> {
+    const res = await axiosInstance.post('/post-das', params_data, {
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+
     return res.data as RunSimulationResponse
 }
 

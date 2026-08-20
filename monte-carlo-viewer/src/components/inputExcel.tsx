@@ -96,8 +96,8 @@ export const InputExcel = () => {
                     {/* Feedback Message */}
                     {message && (
                         <div className={`p-4 rounded-xl text-sm font-medium ${message.toLowerCase().includes("berhasil")
-                                ? "bg-green-50 text-green-700 border border-green-100"
-                                : "bg-red-50 text-red-700 border border-red-100"
+                                ? "bg-red-50 text-red-700 border border-red-100"
+                                : "bg-green-50 text-green-700 border border-green-100"
                             }`}>
                             {message}
                         </div>
