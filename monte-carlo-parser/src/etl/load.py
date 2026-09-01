@@ -71,6 +71,7 @@ def load(result=None, file_path=None, manual_data=None, forecast_years=None, ove
 
     fig2 = plt.figure(figsize=(14, 10))
     sns.heatmap(df_combined, annot=True, fmt=".1f", cmap="YlGnBu", cbar_kws={'label': 'Intensitas Nilai'})
+    plt.yticks(rotation=0)
     plt.title('Heatmap Pola Bulanan Historis dan Prediksi', fontsize=14)
 
     heatmap_path = os.path.join(output_dir, 'heatmap_plot.png')

@@ -1,11 +1,1 @@
-{
-    "forecast_years": 5,
-    "random_seed": 42,
-    "das_parameters": {
-        "luas_das_km2": 500000.0,
-        "cn_value": 75.0,
-        "potensi_retensi_maks_s_mm": 84.67,
-        "abstraksi_awal_ia_mm": 16.93,
-        "iterasi_monte_carlo": 5000
-    }
-}
+{"forecast_years": 100, "random_seed": 42, "das_parameters": {"luas_das_km2": 100.0, "cn_value": 75.0, "potensi_retensi_maks_s_mm": 84.67, "abstraksi_awal_ia_mm": 16.93, "iterasi_monte_carlo": 500}}
