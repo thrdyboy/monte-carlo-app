@@ -1,0 +1,8 @@
+{
+    "rewrites": [
+        {
+            "source": "/api/:path*",
+            "destination": "https://monte-carlo-app-production.up.railway.app/:path*"
+        }
+    ]
+}
