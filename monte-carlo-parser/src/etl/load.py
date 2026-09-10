@@ -47,7 +47,7 @@ def load(result=None, file_path=None, manual_data=None, forecast_years=None, ove
 
     show_plots = _is_interactive_backend()
 
-    fig1 = plt.figure(figsize=(16, 7))
+    fig1 = plt.figure(figsize=(15, 6))
     plt.plot(ts_hist['Tanggal'], ts_hist['Nilai'], color='#1f77b4', label='Data Historis', linewidth=1.2)
 
     plt.plot(ts_pred_conn['Tanggal'], ts_pred_conn['Nilai'], color='#d62728', linestyle='--', label='Prediksi Monte Carlo', linewidth=1.5)
@@ -69,7 +69,7 @@ def load(result=None, file_path=None, manual_data=None, forecast_years=None, ove
     else:
         plt.close(fig1)
 
-    fig2 = plt.figure(figsize=(14, 10))
+    fig2 = plt.figure(figsize=(20, 15))
     sns.heatmap(df_combined, annot=True, fmt=".1f", cmap="YlGnBu", cbar_kws={'label': 'Intensitas Nilai'})
     plt.yticks(rotation=0)
     plt.title('Heatmap Pola Bulanan Historis dan Prediksi', fontsize=14)

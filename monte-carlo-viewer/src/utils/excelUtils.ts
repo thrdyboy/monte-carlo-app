@@ -1,6 +1,6 @@
 // utils/excelUtils.ts
 export async function downloadSimulationExcel() {
-    const baseurl = import.meta.env.VITE_BACKEND_URL as string
+    const baseurl = "/api" as string
     const res = await fetch(`${baseurl}/export-excel`)
     if (!res.ok) {
         throw new Error("Failed to export Excel")
@@ -17,7 +17,7 @@ export async function downloadSimulationExcel() {
 }
 
 export async function downloadDasSimulationExcel() {
-    const baseUrl = import.meta.env.VITE_BACKEND_URL as string
+    const baseUrl = "/api" as string
     const res = await fetch(`${baseUrl}/export-excel-das`)
 
     if (!res.ok) {
