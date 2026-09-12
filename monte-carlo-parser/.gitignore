@@ -22,8 +22,7 @@ airflow-logs/
 logs/
 
 # ─── Data outputs ───
-monte-carlo-parser/data/warehouse/
-monte-carlo-parser/data/raw/uploads/
+data/warehouse/
 
 # ─── OS junk ───
 .DS_Store
