@@ -1,7 +1,7 @@
 import json
 import os
-import uuid
 
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -9,10 +9,27 @@ from api import artifacts, latest, runs
 from api.airflow_client import trigger_dag
 from api.schemas import ManualRunRequest, RunResponse
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Run on startup: make sure warehouse tables exist."""
+    try:
+        from src.etl.load.load_to_postgres import (
+            ensure_artifacts_table,
+            ensure_run_metrics_table,
+        )
+        ensure_artifacts_table()
+        ensure_run_metrics_table()
+        print("[startup] warehouse tables ready")
+    except Exception as e:
+        # Don't crash the API if warehouse is temporarily unreachable
+        print(f"[startup] warning: could not ensure warehouse tables: {e}")
+    yield
+
 app = FastAPI(
     title="Monte Carlo ETL API",
     description="Trigger the Monte Carlo + SCS-CN pipeline via Airflow",
     version="0.1.0",
+    lifespan=lifespan
 )
 
 app.add_middleware(

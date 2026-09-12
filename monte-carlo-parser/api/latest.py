@@ -7,21 +7,48 @@ import pandas as pd
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy import text
+from sqlalchemy.exc import ProgrammingError
 
 from api.dependencies import get_warehouse_engine, get_s3_client
 
 router = APIRouter(prefix="/api/latest", tags=["latest"])
 
+def _table_exists(engine, table_name: str) -> bool:
+    """Return True if the given table exists in the warehouse DB."""
+    from sqlalchemy import text
+    sql = text("""
+        SELECT EXISTS (
+            SELECT 1 FROM information_schema.tables
+            WHERE table_name = :t
+        )
+    """)
+    with engine.connect() as conn:
+        return bool(conn.execute(sql, {"t": table_name}).scalar())
 
 def _get_latest_run_id() -> str:
-    """Return the run_id of the most recently registered artifact."""
+    """Return the run_id of the most recently registered artifact.
+
+    Raises a 404 with a helpful message if the artifacts table is empty
+    OR has not been created yet.
+    """
     engine = get_warehouse_engine()
+
+    if not _table_exists(engine, "artifacts"):
+        raise HTTPException(
+            status_code=404,
+            detail="No pipeline runs yet. Trigger one via POST /api/runs/from-manual or /from-excel.",
+        )
+
     with engine.connect() as conn:
         row = conn.execute(
             text("SELECT run_id FROM artifacts ORDER BY id DESC LIMIT 1")
         ).fetchone()
+
     if not row:
-        raise HTTPException(status_code=404, detail="No artifacts registered yet")
+        raise HTTPException(
+            status_code=404,
+            detail="No pipeline runs yet. Trigger one via POST /api/runs/from-manual or /from-excel.",
+        )
     return row[0]
 
 
