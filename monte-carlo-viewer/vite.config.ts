@@ -6,7 +6,7 @@ export default defineConfig(({ mode }) => {
 
   const env = loadEnv(mode, process.cwd(), '')
 
-  console.log("Backend URL di config:", env.VITE_BACKEND_URL)
+  console.log("Backend URL:", env.VITE_BACKEND_URL)
 
   return {
     plugins: [

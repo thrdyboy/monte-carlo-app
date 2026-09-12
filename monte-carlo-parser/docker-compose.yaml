@@ -1,0 +1,188 @@
+# docker-compose.yaml
+---
+x-airflow-common:
+  &airflow-common
+  build: .
+  image: monte-carlo-airflow:latest
+  environment:
+    &airflow-common-env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${AIRFLOW_DB_USER}:${AIRFLOW_DB_PASSWORD}@postgres/${AIRFLOW_DB_NAME}
+    AIRFLOW__CORE__FERNET_KEY: ''
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+    AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session'
+    AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
+    PYTHONPATH: /opt/airflow
+    # ─── Injected into the container so Python can read them ───
+    WAREHOUSE_DB_USER: ${WAREHOUSE_DB_USER}
+    WAREHOUSE_DB_PASSWORD: ${WAREHOUSE_DB_PASSWORD}
+    WAREHOUSE_DB_NAME: ${WAREHOUSE_DB_NAME}
+    MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+    MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+  volumes:
+    - ./dags:/opt/airflow/dags
+    - airflow-logs:/opt/airflow/logs
+    - ./plugins:/opt/airflow/plugins
+    - ./src:/opt/airflow/src
+    - ./data:/opt/airflow/data
+    - ./requirements.txt:/opt/airflow/requirements.txt
+  user: "${AIRFLOW_UID:-50000}:0"
+  depends_on:
+    postgres:
+      condition: service_healthy
+    warehouse-postgres:
+      condition: service_healthy
+    minio:
+      condition: service_healthy
+
+services:
+  # ─── Airflow metadata DB ───
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${AIRFLOW_DB_USER}
+      POSTGRES_PASSWORD: ${AIRFLOW_DB_PASSWORD}
+      POSTGRES_DB: ${AIRFLOW_DB_NAME}
+    volumes:
+      - postgres-db-volume:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${AIRFLOW_DB_USER} -d ${AIRFLOW_DB_NAME}"]
+      interval: 10s
+      retries: 5
+      start_period: 5s
+    restart: always
+
+  # ─── Warehouse DB (your data) ───
+  warehouse-postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${WAREHOUSE_DB_USER}
+      POSTGRES_PASSWORD: ${WAREHOUSE_DB_PASSWORD}
+      POSTGRES_DB: ${WAREHOUSE_DB_NAME}
+    volumes:
+      - warehouse-db-volume:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${WAREHOUSE_DB_USER} -d ${WAREHOUSE_DB_NAME}"]
+      interval: 10s
+      retries: 5
+      start_period: 5s
+    restart: always
+
+  # ─── MinIO object storage ───
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "mc ready local || exit 1"]
+      interval: 10s
+      retries: 5
+      start_period: 10s
+    restart: always
+
+  # ─── MinIO bucket initializer (runs once, exits) ───
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD};
+      mc mb --ignore-existing local/mc-parquet;
+      mc mb --ignore-existing local/mc-plots;
+      echo 'Buckets created.';
+      exit 0;
+      "
+
+  # ─── Airflow webserver ───
+  airflow-webserver:
+    <<: *airflow-common
+    command: webserver
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: always
+
+  # ─── Airflow scheduler ───
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8974/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: always
+
+  # ─── Airflow init (runs once, exits) ───
+  airflow-init:
+    <<: *airflow-common
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        airflow db migrate
+        airflow users create \
+          --username ${AIRFLOW_ADMIN_USER} \
+          --firstname Admin \
+          --lastname User \
+          --role Admin \
+          --email admin@example.com \
+          --password ${AIRFLOW_ADMIN_PASSWORD}
+    environment:
+      <<: *airflow-common-env
+      _AIRFLOW_DB_MIGRATE: 'true'
+      _AIRFLOW_WWW_USER_CREATE: 'true'
+      _AIRFLOW_WWW_USER_USERNAME: ${AIRFLOW_ADMIN_USER}
+      _AIRFLOW_WWW_USER_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD}
+    user: "0:0"
+  
+  # ─── FastAPI service ───
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    image: monte-carlo-api:latest
+    environment:
+      WAREHOUSE_DB_USER: ${WAREHOUSE_DB_USER}
+      WAREHOUSE_DB_PASSWORD: ${WAREHOUSE_DB_PASSWORD}
+      WAREHOUSE_DB_NAME: ${WAREHOUSE_DB_NAME}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      PYTHONPATH: /app
+      AIRFLOW_API_URL: http://airflow-webserver:8080
+      AIRFLOW_API_USER: ${AIRFLOW_ADMIN_USER}
+      AIRFLOW_API_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD}
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./api:/app/api
+      - ./src:/app/src
+      - ./data:/app/data
+    depends_on:
+      warehouse-postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    restart: always
+
+volumes:
+  postgres-db-volume:
+  airflow-logs:
+  warehouse-db-volume:
+  minio-data:

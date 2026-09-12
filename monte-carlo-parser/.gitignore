@@ -1,16 +1,30 @@
-# Conda Environment
-env/
-envs/
-.conda/
-venv/
-.venv/
+# ─── Secrets ───
+.env
+.env.local
+.env.*.local
+**/.env
+**/.env.local
+**/.env.*.local
 
-# Cache & Metadata
+# ─── Python ───
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
-.ipynb_checkpoints/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
 
-# Tests folder
-tests
+# ─── Node ───
+node_modules/
+dist/
+.vite/
+
+# ─── Airflow ───
+airflow-logs/
+logs/
+
+# ─── Data outputs ───
+monte-carlo-parser/data/warehouse/
+monte-carlo-parser/data/raw/uploads/
+
+# ─── OS junk ───
+.DS_Store
+Thumbs.db

@@ -1,7 +1,7 @@
 data:
   raw_dir: "data/raw/"
   processed_path: "data/processed/simulations_result.csv"
-  sheet_name: 0
+  default_sheet_name: 0
 
 monte_carlo:
   num_simulations: 5000
@@ -23,3 +23,19 @@ columns:
     - "Okt"
     - "Nov"
     - "Des"
+
+runoff:
+  curve_number: 75
+  river_basin_area: 58.87
+
+
+database:
+  host: "warehouse-postgres"
+  port: 5432
+  schema: "public"
+
+minio:
+  endpoint: "minio:9000"
+  bucket_parquet: "mc-parquet"
+  bucket_plots: "mc-plots"
+  secure: false
