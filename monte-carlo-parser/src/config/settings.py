@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Union
 import os
 import yaml
@@ -32,7 +32,10 @@ class DatabaseConfig(BaseModel):
     name: str
     user: str
     password: str
-    schema: str = "public"
+    db_schema: str = Field(default="public", alias="schema")
+
+    class Config:
+        populate_by_name = True
 
 
 class MinioConfig(BaseModel):
@@ -63,6 +66,11 @@ def load_config(path: str = "src/config/montecarlo.yaml") -> AppSettings:
     config_data.setdefault("minio", {})
 
     # ─── Override with env vars (populated by docker-compose from .env) ───
+    
+    if os.getenv("WAREHOUSE_DB_HOST"):
+        config_data["database"]["host"] = os.environ["WAREHOUSE_DB_HOST"]
+    if os.getenv("WAREHOUSE_DB_PORT"):
+        config_data["database"]["port"] = int(os.environ["WAREHOUSE_DB_PORT"])
     if os.getenv("WAREHOUSE_DB_USER"):
         config_data["database"]["user"] = os.environ["WAREHOUSE_DB_USER"]
     if os.getenv("WAREHOUSE_DB_PASSWORD"):
@@ -70,6 +78,9 @@ def load_config(path: str = "src/config/montecarlo.yaml") -> AppSettings:
     if os.getenv("WAREHOUSE_DB_NAME"):
         config_data["database"]["name"] = os.environ["WAREHOUSE_DB_NAME"]
 
+    # ── MinIO overrides from env ──
+    if os.getenv("MINIO_ENDPOINT"):
+        config_data["minio"]["endpoint"] = os.environ["MINIO_ENDPOINT"]
     if os.getenv("MINIO_ROOT_USER"):
         config_data["minio"]["access_key"] = os.environ["MINIO_ROOT_USER"]
     if os.getenv("MINIO_ROOT_PASSWORD"):
