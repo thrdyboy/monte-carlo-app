@@ -2,16 +2,23 @@
 """
 Airflow DAG for the Monte Carlo + Runoff ETL pipeline.
 
-Trigger with custom config (optional). All keys are optional — anything
-omitted falls back to src/config/montecarlo.yaml.
+Input files are exchanged via MinIO (S3-compatible) because Airflow runs
+in a separate container from the API — no shared filesystem on Railway.
+
+Trigger config (all keys optional; omitted ones fall back to montecarlo.yaml):
 
     {
-        "source": "file",              # "file" | "manual" | "both"
+        "source": "file",                  # "file" | "manual" | "both"
+        "input_file_s3_bucket": "...",     # required when source=file
+        "input_file_s3_key": "...",
+        "manual_data_s3_bucket": "...",    # required when source=manual
+        "manual_data_s3_key": "...",
         "forecast_years": 10,
         "num_simulations": 1000,
         "random_seed": 42,
-        "curve_number": 80,            # ← NEW
-        "river_basin_area": 100.5      # ← NEW (km²)
+        "curve_number": 80,
+        "river_basin_area": 100.5,
+        "runoff_scope": "forecast"         # forecast | forecast_mean | combined | combined_mean
     }
 
 Notes:
@@ -67,12 +74,12 @@ def _build_config(**context):
         dag_conf.get("river_basin_area", config.runoff.river_basin_area)
     )
 
-    # ── Runoff scope (forecast-only vs combined) ──
+    # ── Runoff scope (4 valid values matching the API and pipeline) ──
     runoff_scope = str(dag_conf.get("runoff_scope", "forecast")).lower()
-    if runoff_scope not in ("forecast", "combined"):
+    if runoff_scope not in ("forecast", "forecast_mean", "combined", "combined_mean"):
         raise ValueError(
             f"Invalid 'runoff_scope' value: {runoff_scope!r}. "
-            "Must be 'forecast' or 'combined'."
+            "Must be one of: forecast, forecast_mean, combined, combined_mean."
         )
 
     # ── Source selection ──
@@ -144,7 +151,12 @@ def _get_runoff_scope(ti) -> str:
 
 
 def _run_pipeline_from_file(**context):
-    """Download Excel from MinIO, run pipeline, upload results."""
+    """Download Excel from MinIO, run the pipeline, upload results.
+
+    The API container writes the uploaded file to MinIO; this task
+    downloads it to a temp file inside the scheduler container, runs
+    the pipeline on it, then cleans up.
+    """
     import tempfile
     from src.pipeline import run_full_pipeline
     from src.etl.load.load_to_minio import _get_s3_client
@@ -155,11 +167,11 @@ def _run_pipeline_from_file(**context):
     forecast_years = config.monte_carlo.forecast_years
 
     dag_conf = (context.get("dag_run").conf or {}) if context.get("dag_run") else {}
-
     bucket = dag_conf.get("input_file_s3_bucket")
     key = dag_conf.get("input_file_s3_key")
+
     if not bucket or not key:
-        print("[skip] No input_file_s3_bucket/key in dag_run.conf")
+        print("[skip] No 'input_file_s3_bucket'/'input_file_s3_key' in dag_run.conf")
         return
 
     # ── Download from MinIO to a temp file ──
@@ -167,26 +179,35 @@ def _run_pipeline_from_file(**context):
     suffix = os.path.splitext(key)[1] or ".xlsx"
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
         tmp_path = tmp.name
-    s3.download_file(bucket, key, tmp_path)
-    print(f"[pipeline] Downloaded s3://{bucket}/{key} → {tmp_path}")
 
-    output_dir = os.path.join(
-        PROJECT_ROOT, "data", "warehouse",
-        f"airflow_file_{forecast_years}y_{context['ds']}",
-    )
+    try:
+        s3.download_file(bucket, key, tmp_path)
+        print(f"[pipeline] Downloaded s3://{bucket}/{key} → {tmp_path}")
 
-    result = run_full_pipeline(
-        output_dir=output_dir,
-        input_file_path=tmp_path,
-        config=config,
-        runoff_scope=runoff_scope,
-    )
-    print(f"[pipeline] Result: {result}")
-    os.unlink(tmp_path)
+        output_dir = os.path.join(
+            PROJECT_ROOT,
+            "data",
+            "warehouse",
+            f"airflow_file_{forecast_years}y_{context['ds']}",
+        )
+
+        result = run_full_pipeline(
+            output_dir=output_dir,
+            input_file_path=tmp_path,
+            config=config,
+            runoff_scope=runoff_scope,
+        )
+        print(f"[pipeline] Result: {result}")
+    finally:
+        # Always clean up the temp file, even if the pipeline errored
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+
 
 def _run_pipeline_from_manual(**context):
-    """Download manual JSON from MinIO, run pipeline, upload results."""
-    import json
+    """Fetch manual JSON from MinIO, run the pipeline, upload results."""
     from src.pipeline import run_full_pipeline
     from src.etl.load.load_to_minio import _get_s3_client
 
@@ -195,20 +216,27 @@ def _run_pipeline_from_manual(**context):
     runoff_scope = _get_runoff_scope(ti)
     forecast_years = config.monte_carlo.forecast_years
 
-    dag_conf = (context.get("dag_run").conf or {})
+    dag_conf = (context.get("dag_run").conf or {}) if context.get("dag_run") else {}
     bucket = dag_conf.get("manual_data_s3_bucket")
     key = dag_conf.get("manual_data_s3_key")
+
     if not bucket or not key:
-        print("[skip] No manual_data_s3_bucket/key in dag_run.conf")
+        print("[skip] No 'manual_data_s3_bucket'/'manual_data_s3_key' in dag_run.conf")
         return
 
+    # ── Fetch JSON from MinIO ──
     s3 = _get_s3_client(config)
     obj = s3.get_object(Bucket=bucket, Key=key)
     raw = json.loads(obj["Body"].read().decode("utf-8"))
+
+    # Convert string year keys back to int
     manual_data = {int(y): months for y, months in raw.items()}
+    print(f"[pipeline] Fetched s3://{bucket}/{key} ({len(manual_data)} years)")
 
     output_dir = os.path.join(
-        PROJECT_ROOT, "data", "warehouse",
+        PROJECT_ROOT,
+        "data",
+        "warehouse",
         f"airflow_manual_{forecast_years}y_{context['ds']}",
     )
 
