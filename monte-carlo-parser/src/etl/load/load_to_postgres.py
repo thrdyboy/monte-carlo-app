@@ -108,7 +108,7 @@ def register_artifacts(
     df.to_sql(
         "artifacts",
         engine,
-        db_schema=config.database.db_schema,
+        schema=config.database.db_schema,
         if_exists="append",
         index=False,
     )
@@ -171,7 +171,7 @@ def save_run_metrics(
     }])
     df.to_sql(
         "run_metrics", engine,
-        db_schema=config.database.db_schema,
+        schema=config.database.db_schema,
         if_exists="append", index=False,
     )
     print(f"[postgres] Saved metrics for {run_id}: "
