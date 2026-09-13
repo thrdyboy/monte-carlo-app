@@ -193,8 +193,10 @@ def run_full_pipeline(
         print(f"[minio] Uploaded {len(artifacts)} files")
 
     except Exception as e:
-        print(f"[warning] Warehouse/MinIO load failed: {e}")
-        print("[warning] Continuing — local files are still saved.")
+        print(f"[ERROR] Warehouse/MinIO load failed: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
 
     print("--- PIPELINE COMPLETE ---")
     return "Pipeline Completed Successfully"

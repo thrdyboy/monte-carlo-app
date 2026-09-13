@@ -44,7 +44,7 @@ def load_dataframe_to_postgres(
     df_to_save.to_sql(
         table_name,
         engine,
-        db_schema=config.database.db_schema,
+        schema=config.database.db_schema,
         if_exists=if_exists,
         index=False,
         method="multi",
