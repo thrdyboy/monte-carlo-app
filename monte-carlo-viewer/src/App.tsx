@@ -119,16 +119,39 @@ export default function App() {
                 </div>
             </header>
 
-            {/* Some Name List */}
-            <div className="">
-                <ol className="grid grid-cols-2 gap-2">
-                    <li>M. Yusef Tiansyah</li>
-                    <li>F. Heru Widodo</li>
-                    <li>Sunu Tikno</li>
-                    <li>Samsul Bahri</li>
-                    <li>Tukiyat</li>
-                    <li>Muktiyono</li>
-                </ol>
+            {/* Team/Authors List Section */}
+            <div className="bg-white border-b border-slate-200/80 shadow-sm">
+                <div className="max-w-6xl mx-auto px-6 py-3 flex flex-col md:flex-row md:items-center gap-2 md:gap-6">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 shrink-0">
+                        Tim Peneliti / Anggota:
+                    </span>
+                    <ol className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 w-full text-xs font-medium text-slate-600">
+                        <li className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1 rounded-md border border-slate-200/60">
+                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                            M. Yusef Tiansyah
+                        </li>
+                        <li className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1 rounded-md border border-slate-200/60">
+                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                            F. Heru Widodo
+                        </li>
+                        <li className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1 rounded-md border border-slate-200/60">
+                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                            Sunu Tikno
+                        </li>
+                        <li className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1 rounded-md border border-slate-200/60">
+                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                            Samsul Bahri
+                        </li>
+                        <li className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1 rounded-md border border-slate-200/60">
+                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                            Tukiyat
+                        </li>
+                        <li className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1 rounded-md border border-slate-200/60">
+                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                            Muktiyono
+                        </li>
+                    </ol>
+                </div>
             </div>
 
             {/* Tabs */}
