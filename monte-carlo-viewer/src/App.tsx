@@ -119,6 +119,18 @@ export default function App() {
                 </div>
             </header>
 
+            {/* Some Name List */}
+            <div className="">
+                <ol className="grid grid-cols-2 gap-2">
+                    <li>M. Yusef Tiansyah</li>
+                    <li>F. Heru Widodo</li>
+                    <li>Sunu Tikno</li>
+                    <li>Samsul Bahri</li>
+                    <li>Tukiyat</li>
+                    <li>Muktiyono</li>
+                </ol>
+            </div>
+
             {/* Tabs */}
             <div className="max-w-6xl mx-auto px-6 mt-6">
                 <div className="flex gap-1 bg-white rounded-lg border border-slate-200 p-1 w-fit">
