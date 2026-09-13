@@ -178,7 +178,7 @@ def run_full_pipeline(
             rekap_bulanan, "rekap_bulanan", config, if_exists="replace"
         )
 
-        save_run_metrics(               # ← NEW
+        save_run_metrics(               
             run_id=run_id,
             metrics=mc_result["metrics"],
             config=config,

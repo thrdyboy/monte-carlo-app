@@ -1,5 +1,7 @@
 import json
 import os
+import io
+import uuid
 
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
@@ -8,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from api import artifacts, latest, runs
 from api.airflow_client import trigger_dag
 from api.schemas import ManualRunRequest, RunResponse
+from api.dependencies import get_s3_client
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -68,56 +71,50 @@ def root():
         },
     }
 
-
-# ─────────────────────────────────────────────────────────────────────
-# Trigger from manual JSON data
-# ─────────────────────────────────────────────────────────────────────
-
 @app.post("/api/runs/from-manual", response_model=RunResponse)
 def run_from_manual(body: ManualRunRequest):
-    """Save manual data to a JSON file, then trigger the Airflow DAG."""
-    os.makedirs(UPLOAD_DIR, exist_ok=True)
+    """Upload manual JSON to MinIO, then trigger the Airflow DAG."""
+    job_id = uuid.uuid4().hex[:8]
+    object_key = f"inputs/manual_{job_id}.json"
 
-    filename = "manual_latest.json"
-    filepath = os.path.join(UPLOAD_DIR, filename)
-
-    # JSON requires string keys → convert int year keys
+    # JSON requires string keys — convert int year keys
     json_safe = {str(y): months for y, months in body.data.items()}
-    with open(filepath, "w") as f:
-        json.dump(json_safe, f, indent=2)
+    payload = json.dumps(json_safe, indent=2).encode("utf-8")
 
-    relative_path = f"data/raw/uploads/{filename}"
+    # ── Upload to MinIO ──
+    s3 = get_s3_client()
+    try:
+        s3.put_object(
+            Bucket="mc-parquet",                 
+            Key=object_key,
+            Body=payload,
+            ContentType="application/json",
+        )
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"MinIO upload failed: {e}")
 
+    # ── Build DAG config ──
     conf = {
         "source": "manual",
-        "manual_data_path": relative_path,
+        "manual_data_s3_bucket": "mc-parquet",
+        "manual_data_s3_key": object_key,
         "runoff_scope": body.runoff_scope,
     }
-    if body.forecast_years is not None:
-        conf["forecast_years"] = body.forecast_years
-    if body.num_simulations is not None:
-        conf["num_simulations"] = body.num_simulations
-    if body.random_seed is not None:
-        conf["random_seed"] = body.random_seed
-    if body.curve_number is not None:
-        conf["curve_number"] = body.curve_number
-    if body.river_basin_area is not None:
-        conf["river_basin_area"] = body.river_basin_area
+    for k in ("forecast_years", "num_simulations", "random_seed",
+              "curve_number", "river_basin_area"):
+        v = getattr(body, k, None)
+        if v is not None:
+            conf[k] = v
 
     result = trigger_dag(conf)
-
     return RunResponse(
         status="triggered",
         dag_run_id=result.get("dag_run_id", "unknown"),
         source="manual",
-        input_path=relative_path,
+        input_path=f"s3://mc-parquet/{object_key}",
         conf=conf,
     )
 
-
-# ─────────────────────────────────────────────────────────────────────
-# Trigger from Excel upload
-# ─────────────────────────────────────────────────────────────────────
 
 @app.post("/api/runs/from-excel", response_model=RunResponse)
 async def run_from_excel(
@@ -129,29 +126,34 @@ async def run_from_excel(
     river_basin_area: float = Form(None),
     runoff_scope: str = Form("forecast"),
 ):
-    """Save the uploaded Excel file, then trigger the Airflow DAG."""
-    if runoff_scope not in ("forecast", "combined"):
-        raise HTTPException(status_code=400, detail="runoff_scope must be 'forecast' or 'combined'")
+    """Upload Excel to MinIO, then trigger the Airflow DAG."""
+    if runoff_scope not in ("forecast", "forecast_mean", "combined", "combined_mean"):
+        raise HTTPException(status_code=400, detail="Invalid runoff_scope")
 
-    os.makedirs(UPLOAD_DIR, exist_ok=True)
-
-    
+    job_id = uuid.uuid4().hex[:8]
     original = file.filename or "upload.xlsx"
     safe_name = original.replace(" ", "_").replace("/", "_").replace("\\", "_")
-
-    ext = os.path.splitext(safe_name)[1].lower() or ".xlsx"
-    filename = f"excel_latest{ext}"
-    filepath = os.path.join(UPLOAD_DIR, filename)
+    object_key = f"inputs/excel_{job_id}_{safe_name}"
 
     content = await file.read()
-    with open(filepath, "wb") as f:
-        f.write(content)
 
-    relative_path = f"data/raw/uploads/{filename}"
+    # ── Upload to MinIO ──
+    s3 = get_s3_client()
+    try:
+        s3.put_object(
+            Bucket="mc-parquet",
+            Key=object_key,
+            Body=content,
+            ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"MinIO upload failed: {e}")
 
+    # ── Build DAG config ──
     conf = {
         "source": "file",
-        "input_file_path": relative_path,
+        "input_file_s3_bucket": "mc-parquet",
+        "input_file_s3_key": object_key,
         "runoff_scope": runoff_scope,
     }
     if forecast_years is not None:
@@ -166,11 +168,10 @@ async def run_from_excel(
         conf["river_basin_area"] = river_basin_area
 
     result = trigger_dag(conf)
-
     return RunResponse(
         status="triggered",
         dag_run_id=result.get("dag_run_id", "unknown"),
         source="file",
-        input_path=relative_path,
+        input_path=f"s3://mc-parquet/{object_key}",
         conf=conf,
     )

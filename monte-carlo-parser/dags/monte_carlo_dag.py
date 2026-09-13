@@ -144,8 +144,10 @@ def _get_runoff_scope(ti) -> str:
 
 
 def _run_pipeline_from_file(**context):
-    """Run the pipeline using the mock Excel file."""
+    """Download Excel from MinIO, run pipeline, upload results."""
+    import tempfile
     from src.pipeline import run_full_pipeline
+    from src.etl.load.load_to_minio import _get_s3_client
 
     ti = context["ti"]
     config = _rebuild_config(ti)
@@ -153,40 +155,40 @@ def _run_pipeline_from_file(**context):
     forecast_years = config.monte_carlo.forecast_years
 
     dag_conf = (context.get("dag_run").conf or {}) if context.get("dag_run") else {}
-    
-    input_file = dag_conf.get("input_file_path") or os.path.join(
-        PROJECT_ROOT, "data", "raw", "mock_rainfall_data.xlsx"
-    )
 
-    if not os.path.isabs(input_file):
-        input_file = os.path.join(PROJECT_ROOT, input_file)
-
-    if not os.path.exists(input_file):
-        print(f"[skip] Excel file not found: {input_file}")
+    bucket = dag_conf.get("input_file_s3_bucket")
+    key = dag_conf.get("input_file_s3_key")
+    if not bucket or not key:
+        print("[skip] No input_file_s3_bucket/key in dag_run.conf")
         return
 
+    # ── Download from MinIO to a temp file ──
+    s3 = _get_s3_client(config)
+    suffix = os.path.splitext(key)[1] or ".xlsx"
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        tmp_path = tmp.name
+    s3.download_file(bucket, key, tmp_path)
+    print(f"[pipeline] Downloaded s3://{bucket}/{key} → {tmp_path}")
+
     output_dir = os.path.join(
-        PROJECT_ROOT,
-        "data",
-        "warehouse",
+        PROJECT_ROOT, "data", "warehouse",
         f"airflow_file_{forecast_years}y_{context['ds']}",
     )
 
-    print(f"[pipeline] Reading from: {input_file}")
-    print(f"[pipeline] Writing to:  {output_dir}")
-
     result = run_full_pipeline(
         output_dir=output_dir,
-        input_file_path=input_file,
+        input_file_path=tmp_path,
         config=config,
         runoff_scope=runoff_scope,
     )
     print(f"[pipeline] Result: {result}")
-
+    os.unlink(tmp_path)
 
 def _run_pipeline_from_manual(**context):
-    """Run the pipeline using the manual data dictionary."""
+    """Download manual JSON from MinIO, run pipeline, upload results."""
+    import json
     from src.pipeline import run_full_pipeline
+    from src.etl.load.load_to_minio import _get_s3_client
 
     ti = context["ti"]
     config = _rebuild_config(ti)
@@ -194,33 +196,21 @@ def _run_pipeline_from_manual(**context):
     forecast_years = config.monte_carlo.forecast_years
 
     dag_conf = (context.get("dag_run").conf or {})
-    manual_data_path = dag_conf.get("manual_data_path")
-
-    if not manual_data_path:
-        print("[skip] No manual data path provided.")
+    bucket = dag_conf.get("manual_data_s3_bucket")
+    key = dag_conf.get("manual_data_s3_key")
+    if not bucket or not key:
+        print("[skip] No manual_data_s3_bucket/key in dag_run.conf")
         return
 
-    if not os.path.isabs(manual_data_path):
-        manual_data_path = os.path.join(PROJECT_ROOT, manual_data_path)
-
-    if not os.path.exists(manual_data_path):
-        print(f"[skip] Manual data path does not exist: {manual_data_path}")
-        return
-
-    with open(manual_data_path, 'r') as file:
-        raw = json.load(file)
-
+    s3 = _get_s3_client(config)
+    obj = s3.get_object(Bucket=bucket, Key=key)
+    raw = json.loads(obj["Body"].read().decode("utf-8"))
     manual_data = {int(y): months for y, months in raw.items()}
-    
+
     output_dir = os.path.join(
-        PROJECT_ROOT,
-        "data",
-        "warehouse",
+        PROJECT_ROOT, "data", "warehouse",
         f"airflow_manual_{forecast_years}y_{context['ds']}",
     )
-
-    print(f"[pipeline] Manual data years: {sorted(manual_data.keys())}")
-    print(f"[pipeline] Writing to: {output_dir}")
 
     result = run_full_pipeline(
         output_dir=output_dir,
