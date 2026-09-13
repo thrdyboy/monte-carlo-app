@@ -92,6 +92,14 @@ export default function App() {
                         </div>
                     </div>
 
+                    <div className="flex items-center gap-3">
+                        <p className="font-sans text-sm text-slate-500">
+                            Aplikasi Sistem Informasi Prediksi Curah Hujan
+                            Stokastik Berbasis Komputasi Monte Carlo dan Algoritma
+                            Bootstraping Python
+                        </p>
+                    </div>
+
                     <div className="flex items-center gap-2">
                         <button
                             onClick={refresh}
