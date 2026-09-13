@@ -44,7 +44,7 @@ def load_dataframe_to_postgres(
     df_to_save.to_sql(
         table_name,
         engine,
-        schema=config.database.schema,
+        db_schema=config.database.db_schema,
         if_exists=if_exists,
         index=False,
         method="multi",
@@ -61,7 +61,7 @@ def ensure_artifacts_table(config: Optional[Any] = None) -> None:
 
     engine = get_warehouse_engine(config)
     ddl = f"""
-    CREATE TABLE IF NOT EXISTS {config.database.schema}.artifacts (
+    CREATE TABLE IF NOT EXISTS {config.database.db_schema}.artifacts (
         id SERIAL PRIMARY KEY,
         run_id VARCHAR(128) NOT NULL,
         artifact_type VARCHAR(20) NOT NULL,
@@ -108,7 +108,7 @@ def register_artifacts(
     df.to_sql(
         "artifacts",
         engine,
-        schema=config.database.schema,
+        db_schema=config.database.db_schema,
         if_exists="append",
         index=False,
     )
@@ -122,7 +122,7 @@ def ensure_run_metrics_table(config: Optional[Any] = None) -> None:
 
     engine = get_warehouse_engine(config)
     ddl = f"""
-    CREATE TABLE IF NOT EXISTS {config.database.schema}.run_metrics (
+    CREATE TABLE IF NOT EXISTS {config.database.db_schema}.run_metrics (
         id SERIAL PRIMARY KEY,
         run_id VARCHAR(128) NOT NULL,
         dag_run_id VARCHAR(128),
@@ -171,7 +171,7 @@ def save_run_metrics(
     }])
     df.to_sql(
         "run_metrics", engine,
-        schema=config.database.schema,
+        db_schema=config.database.db_schema,
         if_exists="append", index=False,
     )
     print(f"[postgres] Saved metrics for {run_id}: "
