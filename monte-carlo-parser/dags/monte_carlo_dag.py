@@ -184,11 +184,12 @@ def _run_pipeline_from_file(**context):
         s3.download_file(bucket, key, tmp_path)
         print(f"[pipeline] Downloaded s3://{bucket}/{key} → {tmp_path}")
 
+        safe_run_id = context["run_id"].replace(":", "_").replace("+", "_").replace(".", "_")
         output_dir = os.path.join(
             PROJECT_ROOT,
             "data",
             "warehouse",
-            f"airflow_file_{forecast_years}y_{context['ds']}",
+            f"airflow_file_{forecast_years}y_{safe_run_id}",
         )
 
         result = run_full_pipeline(
@@ -233,12 +234,13 @@ def _run_pipeline_from_manual(**context):
     manual_data = {int(y): months for y, months in raw.items()}
     print(f"[pipeline] Fetched s3://{bucket}/{key} ({len(manual_data)} years)")
 
+    safe_run_id = context["run_id"].replace(":", "_").replace("+", "_").replace(".", "_")
     output_dir = os.path.join(
         PROJECT_ROOT,
         "data",
         "warehouse",
-        f"airflow_manual_{forecast_years}y_{context['ds']}",
-    )
+        f"airflow_file_{forecast_years}y_{safe_run_id}",
+    )    
 
     result = run_full_pipeline(
         output_dir=output_dir,
