@@ -86,14 +86,14 @@ export default function App() {
                             <h1 className="text-lg font-semibold leading-tight">
                                 Monte Carlo ETL
                             </h1>
-                            <p className="text-xs text-slate-500">
+                            <p className="text-xs text-black">
                                 Rainfall + SCS-CN runoff forecasting
                             </p>
                         </div>
                     </div>
 
                     <div className="flex items-center gap-3">
-                        <p className="font-sans text-sm text-slate-500">
+                        <p className="font-sans text-sm text-blue-900 font-bold">
                             Aplikasi Sistem Informasi Prediksi Curah Hujan
                             Stokastik Berbasis Komputasi Monte Carlo dan Algoritma
                             Bootstraping Python
