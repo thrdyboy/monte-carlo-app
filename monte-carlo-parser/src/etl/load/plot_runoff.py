@@ -46,9 +46,9 @@ def plot_runoff_time_series(
     ax1.set_xlabel("Bulan ke- (berurutan)")
 
     ax2 = ax1.twinx()
-    ax2.plot(x, df["Runoff_mm"], color="#C44E52", linewidth=1.3, label="Runoff (mm)")
-    ax2.set_ylabel("Runoff (mm)", color="#C44E52")
-    ax2.tick_params(axis="y", labelcolor="#C44E52")
+    ax2.plot(x, df["Runoff_mm"], color="#FE0D15", linewidth=2.5, label="Runoff (mm)")
+    ax2.set_ylabel("Runoff (mm)", color="#FE0D15")
+    ax2.tick_params(axis="y", labelcolor="#FE0D15")
 
     for yr in range(0, n_years + 1, 5):
         ax1.axvline(yr * 12, color="gray", linestyle=":", linewidth=0.6)
