@@ -37,7 +37,7 @@ def plot_mc_time_series(mc_result: Dict[str, Any], out_path: str) -> str:
     if ts_sample is not None:
         ax.plot(ts_sample["Tanggal"], ts_sample["Nilai"],
                 color="#EF0911", linestyle="--", linewidth=1.0,
-                alpha=0.75, label="Sample simulation (Monte Carlo Simulation)", zorder=3)
+                alpha=0.05, label="Sample simulation (Monte Carlo Simulation)", zorder=3)
 
     ax.axvline(ts_hist["Tanggal"].iloc[-1], color="gray",
                linestyle=":", linewidth=0.8)
