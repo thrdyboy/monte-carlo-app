@@ -151,7 +151,11 @@ def run_monte_carlo_iterations(
     df_pred_std = stacked.groupby(level=1).std()
 
     # ONE representative iteration for visualization
-    sample_idx = np.random.randint(0, n_iterations)
+    alpha_params = 5.0
+    weights = np.random.gamma(shape=alpha_params, scale=1, size=n_iterations)
+    weights = weights / weights.sum()
+
+    sample_idx = sample_idx = int(np.random.choice(n_iterations, p=weights))
     df_pred_sample = all_preds[sample_idx]
 
     df_combined = pd.concat([df_hist, df_pred_mean])
@@ -167,13 +171,13 @@ def run_monte_carlo_iterations(
         "df_hist": df_hist,
         "df_pred_mean": df_pred_mean,
         "df_pred_std": df_pred_std,
-        "df_pred_sample": df_pred_sample,       # <-- NEW
+        "df_pred_sample": df_pred_sample,       
         "df_pred_all": all_preds,
         "df_combined": df_combined,
         "ts_hist": ts_hist,
         "ts_pred": ts_pred,
         "ts_pred_std": ts_pred_std,
-        "ts_pred_sample": ts_pred_sample,       # <-- NEW
+        "ts_pred_sample": ts_pred_sample,
         "ts_pred_conn": ts_pred_conn,
         "metrics": metrics,
         "config": config,
