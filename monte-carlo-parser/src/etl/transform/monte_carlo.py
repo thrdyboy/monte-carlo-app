@@ -159,7 +159,7 @@ def run_monte_carlo_iterations(
     df_pred_sample = all_preds[sample_idx]
 
     df_combined = pd.concat([df_hist, df_pred_mean])
-    metrics = _compute_metrics(df_hist, df_pred_mean, months)
+    metrics = _compute_metrics(df_hist, df_pred_sample, months)
 
     ts_hist = _create_ts(df_hist, months)
     ts_pred = _create_ts(df_pred_mean, months)
