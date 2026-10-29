@@ -132,6 +132,7 @@ def ensure_run_metrics_table(config: Optional[Any] = None) -> None:
         curve_number DOUBLE PRECISION,
         river_basin_area DOUBLE PRECISION,
         runoff_scope VARCHAR(32),
+        forecast_method VARCHAR(32),
         mae DOUBLE PRECISION,
         rmse DOUBLE PRECISION,
         mape DOUBLE PRECISION,
@@ -140,6 +141,11 @@ def ensure_run_metrics_table(config: Optional[Any] = None) -> None:
     """
     with engine.begin() as conn:
         conn.execute(text(ddl))
+        # Migrate tables created before forecast_method existed
+        conn.execute(text(
+            f"ALTER TABLE {config.database.db_schema}.run_metrics "
+            f"ADD COLUMN IF NOT EXISTS forecast_method VARCHAR(32)"
+        ))
     engine.dispose()
     print("[postgres] run_metrics table ready")
 
@@ -149,7 +155,8 @@ def save_run_metrics(
     metrics: dict,
     config: Optional[Any] = None,
     dag_run_id: Optional[str] = None,
-    runoff_scope: Optional[str] = None
+    runoff_scope: Optional[str] = None,
+    forecast_method: Optional[str] = None,
 ) -> None:
     """Persist one row of metrics + config metadata."""
     if config is None:
@@ -165,6 +172,7 @@ def save_run_metrics(
         "curve_number": float(config.runoff.curve_number),
         "river_basin_area": float(config.runoff.river_basin_area),
         "runoff_scope": runoff_scope,
+        "forecast_method": forecast_method,
         "mae": float(metrics.get("MAE", 0)),
         "rmse": float(metrics.get("RMSE", 0)),
         "mape": float(metrics.get("MAPE", 0)),

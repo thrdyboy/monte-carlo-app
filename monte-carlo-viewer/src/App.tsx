@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import NewRunPanel from "./components/NewRunPanel";
 import MetricsPanel from "./components/MetricsPanel";
 import PlotsGallery from "./components/PlotsGallery";
@@ -12,12 +12,19 @@ import {
     toApiError,
 } from "./services/api";
 import type {
+    ForecastMethod,
     RunMetrics,
     LatestPlotsResponse,
     LatestTablesResponse,
+    RunTriggeredResponse,
 } from "./types/api";
 
 type Tab = "run" | "results";
+
+const METHOD_OPTIONS: { value: ForecastMethod; label: string }[] = [
+    { value: "monte_carlo", label: "Monte Carlo" },
+    { value: "markov", label: "Markov Chain" },
+];
 
 export default function App() {
     const [tab, setTab] = useState<Tab>("run")
@@ -25,34 +32,65 @@ export default function App() {
     const [metrics, setMetrics] = useState<RunMetrics | null>(null)
     const [plots, setPlots] = useState<LatestPlotsResponse | null>(null)
     const [tables, setTables] = useState<LatestTablesResponse | null>(null)
-    const [loading, setLoading] = useState(false)
+    const [loading, setLoading] = useState(true)
     const [downloading, setDownloading] = useState(false)
+    const [method, setMethod] = useState<ForecastMethod>("monte_carlo")
 
-    const refresh = useCallback(async () => {
-        setLoading(true);
-        try {
-            const [m, p, t] = await Promise.all([
-                getLatestMetrics(),
-                getLatestPlots(),
-                getLatestTables(50),
-            ]);
-            setMetrics(m);
-            setPlots(p);
-            setTables(t);
-        } catch (err) {
-            pushToast("error", toApiError(err).message);
-        } finally {
-            setLoading(false);
+    // Refs so delayed refreshes (setTimeout) always use the *current* method,
+    // and so a slow response for an old method can't overwrite a newer one.
+    const methodRef = useRef<ForecastMethod>(method)
+    const requestIdRef = useRef(0)
+
+    // Fetch results for the current method. Only sets state *after* awaiting,
+    // so it is safe to call from the mount effect.
+    const load = useCallback(async () => {
+        const m = methodRef.current;
+        const requestId = ++requestIdRef.current;
+        // allSettled: a 404 for one endpoint (e.g. no Markov runs yet)
+        // must clear that panel instead of leaving the other method's data.
+        const [mr, pr, tr] = await Promise.allSettled([
+            getLatestMetrics(m),
+            getLatestPlots(m),
+            getLatestTables(50, m),
+        ]);
+        if (requestId !== requestIdRef.current) return; // stale response
+
+        setMetrics(mr.status === "fulfilled" ? mr.value : null);
+        setPlots(pr.status === "fulfilled" ? pr.value : null);
+        setTables(tr.status === "fulfilled" ? tr.value : null);
+        setLoading(false);
+
+        const failed = [mr, pr, tr].find((r) => r.status === "rejected");
+        if (failed && failed.status === "rejected") {
+            pushToast("error", toApiError(failed.reason).message);
         }
     }, []);
 
-    useEffect(() => {
-        refresh();
-    }, [refresh]);
+    const refresh = useCallback(() => {
+        setLoading(true);
+        return load();
+    }, [load]);
 
-    const handleTriggered = async () => {
+    useEffect(() => {
+        load();
+    }, [load]);
+
+    const changeMethod = (m: ForecastMethod) => {
+        if (m === methodRef.current) return;
+        methodRef.current = m;
+        setMethod(m);
+        refresh();
+    };
+
+    const handleTriggered = async (res: RunTriggeredResponse) => {
         // A run was just queued — wait a moment, then refresh
         // (Airflow needs a few seconds to actually finish the DAG)
+        const triggered = res.conf?.forecast_method;
+        if (triggered === "monte_carlo" || triggered === "markov") {
+            // show results for the method just run
+            methodRef.current = triggered;
+            setMethod(triggered);
+        }
         setTab("results");
         setTimeout(refresh, 3000);
         setTimeout(refresh, 10000);
@@ -62,7 +100,7 @@ export default function App() {
     const handleDownloadExcel = async () => {
         setDownloading(true);
         try {
-            await downloadLatestExcel();
+            await downloadLatestExcel(undefined, method);
             pushToast("success", "Excel report downloaded.");
         } catch (err) {
             pushToast("error", toApiError(err).message);
@@ -178,6 +216,27 @@ export default function App() {
 
                 {tab === "results" && (
                     <>
+                        {/* Forecast method toggle */}
+                        <div className="flex items-center gap-3">
+                            <span className="text-sm font-medium text-slate-600">
+                                Forecast Method
+                            </span>
+                            <div className="flex gap-1 bg-white rounded-lg border border-slate-200 p-1 w-fit">
+                                {METHOD_OPTIONS.map((opt) => (
+                                    <button
+                                        key={opt.value}
+                                        onClick={() => changeMethod(opt.value)}
+                                        className={`text-sm px-4 py-1.5 rounded-md font-medium transition-colors ${method === opt.value
+                                            ? "bg-indigo-600 text-white"
+                                            : "text-slate-600 hover:bg-slate-50"
+                                            }`}
+                                    >
+                                        {opt.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
                         <MetricsPanel metrics={metrics} />
                         <PlotsGallery data={plots} />
                         <TablesPreview data={tables} />

@@ -1,8 +1,7 @@
 import io
 import os
-from typing import Optional
+from typing import Literal, Optional
 
-import numpy as np
 import pandas as pd
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
@@ -10,8 +9,11 @@ from sqlalchemy import text
 from sqlalchemy.exc import ProgrammingError
 
 from api.dependencies import get_warehouse_engine, get_s3_client
+from api.utils.formatters import _df_to_json_safe_records, _safe_sheet_name
 
 router = APIRouter(prefix="/api/latest", tags=["latest"])
+
+ForecastMethod = Literal["monte_carlo", "markov"]
 
 def _table_exists(engine, table_name: str) -> bool:
     """Return True if the given table exists in the warehouse DB."""
@@ -25,19 +27,44 @@ def _table_exists(engine, table_name: str) -> bool:
     with engine.connect() as conn:
         return bool(conn.execute(sql, {"t": table_name}).scalar())
 
-def _get_latest_run_id() -> str:
-    """Return the run_id of the most recently registered artifact.
+def _get_latest_run_id(method: Optional[str] = None) -> str:
+    """Return the run_id of the most recent run.
 
-    Raises a 404 with a helpful message if the artifacts table is empty
-    OR has not been created yet.
+    - If `method` is given and run_metrics has rows, return the newest run
+      whose forecast_method matches (and that has registered artifacts).
+      404 if there is no run for that method yet.
+    - If `method` is None, or run_metrics doesn't exist / is empty, fall back
+      to the most recently registered artifact.
     """
     engine = get_warehouse_engine()
+    no_runs = "No pipeline runs yet. Trigger one via POST /api/runs/from-manual or /from-excel."
 
     if not _table_exists(engine, "artifacts"):
-        raise HTTPException(
-            status_code=404,
-            detail="No pipeline runs yet. Trigger one via POST /api/runs/from-manual or /from-excel.",
-        )
+        raise HTTPException(status_code=404, detail=no_runs)
+
+    if method is not None and _table_exists(engine, "run_metrics"):
+        with engine.connect() as conn:
+            has_metrics = conn.execute(
+                text("SELECT EXISTS (SELECT 1 FROM run_metrics)")
+            ).scalar()
+            if has_metrics:
+                row = conn.execute(
+                    text("""
+                        SELECT rm.run_id
+                        FROM run_metrics rm
+                        WHERE rm.forecast_method = :method
+                          AND EXISTS (SELECT 1 FROM artifacts a WHERE a.run_id = rm.run_id)
+                        ORDER BY rm.id DESC
+                        LIMIT 1
+                    """),
+                    {"method": method},
+                ).fetchone()
+                if not row:
+                    raise HTTPException(
+                        status_code=404,
+                        detail=f"No '{method}' runs yet. Trigger one with forecast_method='{method}'.",
+                    )
+                return row[0]
 
     with engine.connect() as conn:
         row = conn.execute(
@@ -45,10 +72,7 @@ def _get_latest_run_id() -> str:
         ).fetchone()
 
     if not row:
-        raise HTTPException(
-            status_code=404,
-            detail="No pipeline runs yet. Trigger one via POST /api/runs/from-manual or /from-excel.",
-        )
+        raise HTTPException(status_code=404, detail=no_runs)
     return row[0]
 
 
@@ -73,7 +97,10 @@ def _fetch_artifacts(run_id: str, artifact_type: str) -> list:
 # ─────────────────────────────────────────────────────────────────────
 
 @router.get("/plots")
-def list_latest_plots(run_id: Optional[str] = Query(None)):
+def list_latest_plots(
+    run_id: Optional[str] = Query(None),
+    method: Optional[ForecastMethod] = Query(None),
+):
     """Return every PNG plot from the latest (or specified) run.
 
     Frontend usage:
@@ -81,7 +108,7 @@ def list_latest_plots(run_id: Optional[str] = Query(None)):
         plots.map(p => <img src={p.view_url} />);
     """
     if run_id is None:
-        run_id = _get_latest_run_id()
+        run_id = _get_latest_run_id(method)
 
     rows = _fetch_artifacts(run_id, "png")
     if not rows:
@@ -107,41 +134,11 @@ def list_latest_plots(run_id: Optional[str] = Query(None)):
 # Tables (parquet -> JSON preview)
 # ─────────────────────────────────────────────────────────────────────
 
-def _df_to_json_safe_records(df: pd.DataFrame, limit: int) -> list:
-    """Convert the first `limit` rows of a DataFrame to JSON-safe dicts.
-
-    Handles NaN, NaT, Timestamps, numpy scalars — everything FastAPI's
-    default JSON encoder would choke on.
-    """
-    preview = df.head(limit).copy()
-
-    # Convert to object dtype so NaN/NaT become Python None cleanly
-    preview = preview.astype(object).where(pd.notnull(preview), None)
-
-    records = []
-    for _, row in preview.iterrows():
-        rec = {}
-        for col, val in row.items():
-            # pandas Timestamp → ISO string
-            if hasattr(val, "isoformat"):
-                val = val.isoformat()
-            # numpy scalar → python scalar
-            elif isinstance(val, (np.integer,)):
-                val = int(val)
-            elif isinstance(val, (np.floating,)):
-                val = float(val)
-            elif isinstance(val, (np.bool_,)):
-                val = bool(val)
-            rec[col] = val
-        records.append(rec)
-
-    return records
-
-
 @router.get("/tables")
 def list_latest_tables(
     run_id: Optional[str] = Query(None),
     limit: int = Query(100, ge=1, le=1000),
+    method: Optional[ForecastMethod] = Query(None),
 ):
     """Return every parquet table from the latest (or specified) run,
     with the first `limit` rows as a JSON preview.
@@ -151,7 +148,7 @@ def list_latest_tables(
         tables.map(t => <DataTable columns={t.columns} rows={t.rows} />);
     """
     if run_id is None:
-        run_id = _get_latest_run_id()
+        run_id = _get_latest_run_id(method)
 
     rows = _fetch_artifacts(run_id, "parquet")
     if not rows:
@@ -193,24 +190,16 @@ def list_latest_tables(
         "tables": tables,
     }
 
+
 # ─────────────────────────────────────────────────────────────────────
 # Bundle the whole latest run into a single Excel workbook
 # ─────────────────────────────────────────────────────────────────────
 
-def _safe_sheet_name(name: str, used: set) -> str:
-    """Excel sheet names: max 31 chars, cannot contain : \\ / ? * [ ]"""
-    import re
-    cleaned = re.sub(r"[:\\/?*\[\]]", "_", name)[:31] or "Sheet"
-    final, i = cleaned, 1
-    while final in used:
-        suffix = f"_{i}"
-        final = cleaned[:31 - len(suffix)] + suffix
-        i += 1
-    return final
-
-
 @router.get("/excel")
-def download_latest_as_excel(run_id: Optional[str] = Query(None)):
+def download_latest_as_excel(
+    run_id: Optional[str] = Query(None),
+    method: Optional[ForecastMethod] = Query(None),
+):
     """Bundle all parquet tables from a run into ONE Excel file.
 
     Each parquet becomes a sheet. Also adds a "Metadata" sheet listing
@@ -220,7 +209,7 @@ def download_latest_as_excel(run_id: Optional[str] = Query(None)):
         <a href="/api/latest/excel" download>Download all as Excel</a>
     """
     if run_id is None:
-        run_id = _get_latest_run_id()
+        run_id = _get_latest_run_id(method)
 
     rows = _fetch_artifacts(run_id, "parquet")
     if not rows:

@@ -19,6 +19,8 @@ export type RunoffScope =
 
 export type RunSource = "file" | "manual" | "both";
 
+export type ForecastMethod = "monte_carlo" | "markov";
+
 // ─────────────────────────────────────────────────────────────────────
 // POST /api/runs/from-manual
 // ─────────────────────────────────────────────────────────────────────
@@ -34,6 +36,7 @@ export interface ManualRunBody {
     curve_number?: number;
     river_basin_area?: number;
     runoff_scope?: RunoffScope;
+    forecast_method?: ForecastMethod;
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -47,6 +50,7 @@ export interface ManualRunBody {
 //   curve_number?: number
 //   river_basin_area?: number
 //   runoff_scope?: RunoffScope
+//   forecast_method?: ForecastMethod
 
 export interface ExcelRunFormOptions {
     forecast_years?: number;
@@ -55,6 +59,7 @@ export interface ExcelRunFormOptions {
     curve_number?: number;
     river_basin_area?: number;
     runoff_scope?: RunoffScope;
+    forecast_method?: ForecastMethod;
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -84,6 +89,7 @@ export interface RunMetrics {
     curve_number: number;
     river_basin_area: number;
     runoff_scope: RunoffScope | null;
+    forecast_method: ForecastMethod | null;
     mae: number;
     rmse: number;
     mape: number;

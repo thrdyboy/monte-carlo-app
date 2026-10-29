@@ -7,7 +7,7 @@ from unittest.mock import patch, MagicMock
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-from src.etl.load.plot_monte_carlo import plot_mc_time_series, plot_mc_heatmap
+from src.etl.load.plot_forecast import plot_forecast_time_series, plot_forecast_heatmap
 from src.etl.load.plot_runoff import (
     plot_runoff_time_series,
     plot_runoff_monthly_avg,
@@ -32,7 +32,7 @@ def mock_config():
 
 
 @pytest.fixture
-def mc_result():
+def forecast_result():
     ts_hist = pd.DataFrame({
         "Tanggal": pd.to_datetime(["2020-01-01", "2020-02-01", "2020-03-01"]),
         "Nilai": [10.0, 20.0, 30.0],
@@ -99,38 +99,38 @@ def _assert_valid_png(path: str) -> None:
 
 
 # ==========================================
-# plot_monte_carlo
+# plot_forecast
 # ==========================================
 
-def test_plot_mc_time_series_creates_png(mc_result, tmp_path):
+def test_plot_forecast_time_series_creates_png(forecast_result, tmp_path):
     out = tmp_path / "mc_time_series.png"
-    returned = plot_mc_time_series(mc_result, str(out))
+    returned = plot_forecast_time_series(forecast_result, str(out))
     assert returned == str(out)
     _assert_valid_png(str(out))
 
 
-def test_plot_mc_heatmap_creates_png(mc_result, mock_config, tmp_path):
+def test_plot_forecast_heatmap_creates_png(forecast_result, mock_config, tmp_path):
     out = tmp_path / "mc_heatmap.png"
-    returned = plot_mc_heatmap(mc_result, str(out), config=mock_config)
+    returned = plot_forecast_heatmap(forecast_result, str(out), config=mock_config)
     assert returned == str(out)
     _assert_valid_png(str(out))
 
 
-@patch('src.etl.load.plot_monte_carlo.load_config')
-def test_plot_mc_heatmap_loads_config_when_missing(
-    mock_load_config, mc_result, mock_config, tmp_path
+@patch('src.etl.load.plot_forecast.load_config')
+def test_plot_forecast_heatmap_loads_config_when_missing(
+    mock_load_config, forecast_result, mock_config, tmp_path
 ):
     mock_load_config.return_value = mock_config
     out = tmp_path / "mc_heatmap.png"
-    plot_mc_heatmap(mc_result, str(out))
+    plot_forecast_heatmap(forecast_result, str(out))
     mock_load_config.assert_called_once()
     _assert_valid_png(str(out))
 
 
-def test_plot_mc_heatmap_uses_configured_months(mc_result, mock_config, tmp_path):
-    mc_result["df_pred"]["Extra"] = [99.0, 99.0]
+def test_plot_forecast_heatmap_uses_configured_months(forecast_result, mock_config, tmp_path):
+    forecast_result["df_pred"]["Extra"] = [99.0, 99.0]
     out = tmp_path / "mc_heatmap.png"
-    plot_mc_heatmap(mc_result, str(out), config=mock_config)
+    plot_forecast_heatmap(forecast_result, str(out), config=mock_config)
     _assert_valid_png(str(out))
 
 
@@ -177,10 +177,10 @@ def test_runoff_time_series_handles_single_year(runoff_result, mock_config, tmp_
     _assert_valid_png(str(out))
 
 
-def test_all_plots_generate_together(mc_result, runoff_result, mock_config, tmp_path):
+def test_all_plots_generate_together(forecast_result, runoff_result, mock_config, tmp_path):
     outputs = [
-        plot_mc_time_series(mc_result, str(tmp_path / "mc_ts.png")),
-        plot_mc_heatmap(mc_result, str(tmp_path / "mc_hm.png"), config=mock_config),
+        plot_forecast_time_series(forecast_result, str(tmp_path / "mc_ts.png")),
+        plot_forecast_heatmap(forecast_result, str(tmp_path / "mc_hm.png"), config=mock_config),
         plot_runoff_time_series(runoff_result, str(tmp_path / "ro_ts.png"), config=mock_config),
         plot_runoff_monthly_avg(runoff_result, str(tmp_path / "ro_avg.png"), config=mock_config),
         plot_runoff_discharge(runoff_result, str(tmp_path / "ro_dis.png"), config=mock_config),

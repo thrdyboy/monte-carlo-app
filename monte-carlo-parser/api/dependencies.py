@@ -12,7 +12,7 @@ def get_warehouse_engine() -> Engine:
     user = os.environ["WAREHOUSE_DB_USER"]
     password = os.environ["WAREHOUSE_DB_PASSWORD"]
     name = os.environ["WAREHOUSE_DB_NAME"]
-    host = os.environ.get("WAREHOUSE_DB_HOST", "warehouse-postgres")
+    host = os.environ.get("WAREHOUSE_DB_HOST", "warehouse-postgres")  # docker service name locally
     port = int(os.environ.get("WAREHOUSE_DB_PORT", "5432"))
 
     # Get the URL

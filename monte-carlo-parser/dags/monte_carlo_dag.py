@@ -18,7 +18,8 @@ Trigger config (all keys optional; omitted ones fall back to montecarlo.yaml):
         "random_seed": 42,
         "curve_number": 80,
         "river_basin_area": 100.5,
-        "runoff_scope": "forecast"         # forecast | forecast_mean | combined | combined_mean
+        "runoff_scope": "forecast",        # forecast | forecast_mean | combined | combined_mean
+        "forecast_method": "monte_carlo"   # monte_carlo | markov
     }
 
 Notes:
@@ -82,6 +83,14 @@ def _build_config(**context):
             "Must be one of: forecast, forecast_mean, combined, combined_mean."
         )
 
+    # ── Forecast method ──
+    forecast_method = str(dag_conf.get("forecast_method", "monte_carlo")).lower()
+    if forecast_method not in ("monte_carlo", "markov"):
+        raise ValueError(
+            f"Invalid 'forecast_method' value: {forecast_method!r}. "
+            "Must be 'monte_carlo' or 'markov'."
+        )
+
     # ── Source selection ──
     source = str(dag_conf.get("source", "both")).lower()
     if source not in ("file", "manual", "both"):
@@ -97,6 +106,7 @@ def _build_config(**context):
     ti.xcom_push(key="curve_number", value=curve_number)
     ti.xcom_push(key="river_basin_area", value=river_basin_area)
     ti.xcom_push(key="runoff_scope", value=runoff_scope)
+    ti.xcom_push(key="forecast_method", value=forecast_method)
     ti.xcom_push(key="source", value=source)
 
     print(f"[config] forecast_years   = {forecast_years}")
@@ -105,6 +115,7 @@ def _build_config(**context):
     print(f"[config] curve_number     = {curve_number}")
     print(f"[config] river_basin_area = {river_basin_area} km²")
     print(f"[config] runoff_scope     = {runoff_scope}")
+    print(f"[config] forecast_method  = {forecast_method}")
     print(f"[config] source           = {source}")
 
 
@@ -150,6 +161,10 @@ def _get_runoff_scope(ti) -> str:
     return ti.xcom_pull(task_ids="build_config", key="runoff_scope") or "forecast"
 
 
+def _get_forecast_method(ti) -> str:
+    return ti.xcom_pull(task_ids="build_config", key="forecast_method") or "monte_carlo"
+
+
 def _run_pipeline_from_file(**context):
     """Download Excel from MinIO, run the pipeline, upload results.
 
@@ -164,6 +179,7 @@ def _run_pipeline_from_file(**context):
     ti = context["ti"]
     config = _rebuild_config(ti)
     runoff_scope = _get_runoff_scope(ti)
+    forecast_method = _get_forecast_method(ti)
     forecast_years = config.monte_carlo.forecast_years
 
     dag_conf = (context.get("dag_run").conf or {}) if context.get("dag_run") else {}
@@ -197,6 +213,7 @@ def _run_pipeline_from_file(**context):
             input_file_path=tmp_path,
             config=config,
             runoff_scope=runoff_scope,
+            forecast_method=forecast_method,
         )
         print(f"[pipeline] Result: {result}")
     finally:
@@ -215,6 +232,7 @@ def _run_pipeline_from_manual(**context):
     ti = context["ti"]
     config = _rebuild_config(ti)
     runoff_scope = _get_runoff_scope(ti)
+    forecast_method = _get_forecast_method(ti)
     forecast_years = config.monte_carlo.forecast_years
 
     dag_conf = (context.get("dag_run").conf or {}) if context.get("dag_run") else {}
@@ -247,6 +265,7 @@ def _run_pipeline_from_manual(**context):
         manual_data=manual_data,
         config=config,
         runoff_scope=runoff_scope,
+        forecast_method=forecast_method,
     )
     print(f"[pipeline] Result: {result}")
 

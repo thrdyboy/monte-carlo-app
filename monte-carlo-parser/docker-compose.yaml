@@ -168,6 +168,7 @@ services:
       AIRFLOW_API_URL: http://airflow-webserver:8080
       AIRFLOW_API_USER: ${AIRFLOW_ADMIN_USER}
       AIRFLOW_API_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-*}
     ports:
       - "8000:8000"
     volumes:

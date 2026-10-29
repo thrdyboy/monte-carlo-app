@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Union
 import os
 import yaml
@@ -34,8 +34,7 @@ class DatabaseConfig(BaseModel):
     password: str
     db_schema: str = Field(default="public", alias="schema")
 
-    class Config:
-        populate_by_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class MinioConfig(BaseModel):

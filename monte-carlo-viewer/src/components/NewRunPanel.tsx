@@ -5,6 +5,7 @@ import {
     toApiError,
 } from "../services/api";
 import type {
+    ForecastMethod,
     ManualRainfallData,
     RunoffScope,
     RunTriggeredResponse,
@@ -89,6 +90,7 @@ export default function NewRunPanel({ onTriggered }: Props) {
     const [curveNumber, setCurveNumber] = useState(75);
     const [riverBasinArea, setRiverBasinArea] = useState(58.87);
     const [runoffScope, setRunoffScope] = useState<RunoffScope>("forecast");
+    const [forecastMethod, setForecastMethod] = useState<ForecastMethod>("monte_carlo");
 
     const [rows, setRows] = useState<Row[]>([emptyRow(2020), emptyRow(2021), emptyRow(2022)]);
     const [file, setFile] = useState<File | null>(null);
@@ -125,6 +127,7 @@ export default function NewRunPanel({ onTriggered }: Props) {
                     curve_number: curveNumber,
                     river_basin_area: riverBasinArea,
                     runoff_scope: runoffScope,
+                    forecast_method: forecastMethod,
                 });
             } else {
                 if (!file) {
@@ -137,6 +140,7 @@ export default function NewRunPanel({ onTriggered }: Props) {
                     curve_number: curveNumber,
                     river_basin_area: riverBasinArea,
                     runoff_scope: runoffScope,
+                    forecast_method: forecastMethod,
                 });
             }
             pushToast("success", `Triggered: ${res.dag_run_id}`);
@@ -168,6 +172,17 @@ export default function NewRunPanel({ onTriggered }: Props) {
             <div className="p-6 space-y-6">
                 {/* Parameters */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <label className="flex flex-col gap-1 text-sm">
+                        <span className="text-slate-600 font-medium">Forecast Method</span>
+                        <select
+                            value={forecastMethod}
+                            onChange={(e) => setForecastMethod(e.target.value as ForecastMethod)}
+                            className="border border-slate-300 rounded-md px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                        >
+                            <option value="monte_carlo">Monte Carlo</option>
+                            <option value="markov">Markov Chain</option>
+                        </select>
+                    </label>
                     <label className="flex flex-col gap-1 text-sm">
                         <span className="text-slate-600 font-medium">Forecast years</span>
                         <input
@@ -204,7 +219,7 @@ export default function NewRunPanel({ onTriggered }: Props) {
                             className="border border-slate-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400"
                         />
                     </label>
-                    <label className="flex flex-col gap-1 text-sm md:col-span-2">
+                    <label className="flex flex-col gap-1 text-sm">
                         <span className="text-slate-600 font-medium">Runoff scope</span>
                         <select
                             value={runoffScope}

@@ -11,7 +11,6 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '.
 
 from src.config.settings import load_config
 
-
 def _setup_style():
     plt.rcParams.update({
         "font.size": 10,

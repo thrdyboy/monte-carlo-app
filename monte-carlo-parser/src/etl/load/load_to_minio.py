@@ -15,10 +15,14 @@ def _get_s3_client(config: Optional[Any] = None):
     if config is None:
         config = load_config()
 
+    # Env var wins (local: docker service name, prod: Railway host),
+    # then the YAML/config value, then the docker-compose default.
+    endpoint = os.environ.get("MINIO_ENDPOINT", config.minio.endpoint or "minio:9000")
+
     scheme = "https" if config.minio.secure else "http"
     return boto3.client(
         "s3",
-        endpoint_url=f"{scheme}://{config.minio.endpoint}",
+        endpoint_url=f"{scheme}://{endpoint}",
         aws_access_key_id=config.minio.access_key,
         aws_secret_access_key=config.minio.secret_key,
         config=BotoConfig(signature_version="s3v4"),

@@ -13,7 +13,12 @@ class ManualRunRequest(BaseModel):
     random_seed: Optional[int] = None
     curve_number: Optional[float] = Field(None, ge=1, le=100)
     river_basin_area: Optional[float] = Field(None, gt=0)
-    runoff_scope: str = Field("forecast", pattern="^(forecast|combined)$")
+    runoff_scope: str = Field("forecast", pattern="^(forecast|forecast_mean|combined|combined_mean)$")
+    forecast_method: Optional[str] = Field("monte_carlo", pattern="^(monte_carlo|markov)$")
+
+
+# Alias for backward/spec compatibility
+ManualRunBody = ManualRunRequest
 
 
 class RunResponse(BaseModel):

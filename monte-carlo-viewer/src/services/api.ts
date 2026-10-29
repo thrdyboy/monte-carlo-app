@@ -4,6 +4,7 @@ import type {
     RunTriggeredResponse,
     ManualRunBody,
     ExcelRunFormOptions,
+    ForecastMethod,
     RunMetrics,
     LatestPlotsResponse,
     LatestTablesResponse,
@@ -49,6 +50,8 @@ export async function triggerRunFromExcel(
         form.append("river_basin_area", String(options.river_basin_area));
     if (options.runoff_scope != null)
         form.append("runoff_scope", options.runoff_scope);
+    if (options.forecast_method != null)
+        form.append("forecast_method", options.forecast_method);
 
     const { data } = await axiosInstance.post<RunTriggeredResponse>(
         "/runs/from-excel",
@@ -69,10 +72,17 @@ export async function listRunMetrics(limit = 50): Promise<RunMetrics[]> {
     return data;
 }
 
-/** Convenience: fetch only the newest metrics row, or null if none exist. */
-export async function getLatestMetrics(): Promise<RunMetrics | null> {
-    const rows = await listRunMetrics(1);
-    return rows.length > 0 ? rows[0] : null;
+/** Convenience: fetch the newest metrics row (optionally for one forecast
+ *  method), or null if none exist. */
+export async function getLatestMetrics(
+    method?: ForecastMethod,
+): Promise<RunMetrics | null> {
+    if (!method) {
+        const rows = await listRunMetrics(1);
+        return rows.length > 0 ? rows[0] : null;
+    }
+    const rows = await listRunMetrics(500);
+    return rows.find((r) => r.forecast_method === method) ?? null;
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -80,11 +90,17 @@ export async function getLatestMetrics(): Promise<RunMetrics | null> {
 // ─────────────────────────────────────────────────────────────────────
 
 export async function getLatestPlots(
+    method?: ForecastMethod,
     runId?: string,
 ): Promise<LatestPlotsResponse> {
     const { data } = await axiosInstance.get<LatestPlotsResponse>(
         "/latest/plots",
-        { params: runId ? { run_id: runId } : undefined },
+        {
+            params: {
+                ...(method ? { method } : {}),
+                ...(runId ? { run_id: runId } : {}),
+            },
+        },
     );
     return data;
 }
@@ -95,11 +111,18 @@ export async function getLatestPlots(
 
 export async function getLatestTables(
     limit = 100,
+    method?: ForecastMethod,
     runId?: string,
 ): Promise<LatestTablesResponse> {
     const { data } = await axiosInstance.get<LatestTablesResponse>(
         "/latest/tables",
-        { params: { limit, ...(runId ? { run_id: runId } : {}) } },
+        {
+            params: {
+                limit,
+                ...(method ? { method } : {}),
+                ...(runId ? { run_id: runId } : {}),
+            },
+        },
     );
     return data;
 }
@@ -109,10 +132,16 @@ export async function getLatestTables(
 //    Not JSON — the response is a binary .xlsx.
 // ─────────────────────────────────────────────────────────────────────
 
-export async function downloadLatestExcel(runId?: string): Promise<void> {
+export async function downloadLatestExcel(
+    runId?: string,
+    method?: ForecastMethod,
+): Promise<void> {
     const res = await axiosInstance.get("/latest/excel", {
         responseType: "blob",
-        params: runId ? { run_id: runId } : undefined,
+        params: {
+            ...(runId ? { run_id: runId } : {}),
+            ...(method ? { method } : {}),
+        },
     });
 
     // Extract filename from Content-Disposition if present, else fallback.
